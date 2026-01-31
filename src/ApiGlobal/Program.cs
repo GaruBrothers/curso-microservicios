@@ -1,11 +1,21 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using ApiGlobal.Data;
 using ApiGlobal.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// 🔹 Swagger / OpenAPI
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new()
+    {
+        Title = "ApiGlobal",
+        Version = "v1"
+    });
+});
+
+// 🔹 DbContext
 builder.Services.AddDbContext<DataContext>(options =>
 {
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"));
@@ -13,45 +23,56 @@ builder.Services.AddDbContext<DataContext>(options =>
 
 var app = builder.Build();
 
+// 🔹 Middleware
 app.UseSwagger();
-app.UseSwaggerUI();
+app.UseSwaggerUI(c =>
+{
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "ApiGlobal v1");
+});
+
 app.UseHttpsRedirection();
 
-async Task<List<Adult>> GetAdults(DataContext context) => await context.Adults.ToListAsync();
-app.MapGet("/Adults", async (DataContext context) => await GetAdults(context))
+// 🔹 Endpoints
+app.MapGet("/Adults", async (DataContext context) =>
+    await context.Adults.ToListAsync()
+)
 .WithName("GetAdults")
 .WithOpenApi();
 
-async Task<List<Child>> GetChildren(DataContext context) => await context.Children.ToListAsync();
-app.MapGet("/Children", async (DataContext context) => await GetChildren(context))
+app.MapGet("/Children", async (DataContext context) =>
+    await context.Children.ToListAsync()
+)
 .WithName("GetChildren")
 .WithOpenApi();
 
-app.MapGet("/Adults/{id}", async (DataContext context, int id) => await context.Adults.FindAsync(id))
+app.MapGet("/Adults/{id:int}", async (DataContext context, int id) =>
+    await context.Adults.FindAsync(id)
+)
 .WithName("GetAdultById")
 .WithOpenApi();
 
-app.MapGet("/Children/{id}", async (DataContext context, int id) => await context.Children.FindAsync(id))
+app.MapGet("/Children/{id:int}", async (DataContext context, int id) =>
+    await context.Children.FindAsync(id)
+)
 .WithName("GetChildById")
 .WithOpenApi();
 
-app.MapPost("Add/Adults",async(DataContext context, Adult item) =>
+app.MapPost("/Add/Adults", async (DataContext context, Adult item) =>
 {
     context.Adults.Add(item);
     await context.SaveChangesAsync();
-    return Results.Ok(await GetAdults(context));
+    return Results.Created($"/Adults/{item.Id}", item);
 })
 .WithName("AddAdult")
 .WithOpenApi();
 
-app.MapPost("Add/Children",async(DataContext context, Child item) =>
+app.MapPost("/Add/Children", async (DataContext context, Child item) =>
 {
     context.Children.Add(item);
     await context.SaveChangesAsync();
-    return Results.Ok(await GetChildren(context));
+    return Results.Created($"/Children/{item.Id}", item);
 })
 .WithName("AddChild")
 .WithOpenApi();
 
 app.Run();
-
